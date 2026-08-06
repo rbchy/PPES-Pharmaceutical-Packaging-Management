@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pharma Packaging Batch Yield Calculator</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-100 min-h-screen p-4 md:p-8 flex items-center justify-center font-sans">
+
+  <div class="max-w-3xl w-full bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden">
+    <!-- Header -->
+    <div class="bg-slate-800 text-white p-6">
+      <div class="flex justify-between items-center">
+        <div>
+          <h1 class="text-xl font-bold tracking-wide">Batch Yield Reconciliation Calculator</h1>
+          <p class="text-xs text-slate-300 mt-1">Pharma Packaging Line cGMP Yield Verification Utility</p>
+        </div>
+        <span class="bg-blue-600 text-xs px-3 py-1 rounded-full uppercase tracking-wider font-semibold">cGMP Compliant</span>
+      </div>
+    </div>
+
+    <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+
+      <!-- Left Column: Inputs -->
+      <div class="space-y-4">
+        <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider border-b pb-1">1. Batch Inputs (Units)</h2>
+
+        <!-- Input Qty -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Total Bulk Input ($I$) <span class="text-slate-400 font-normal">(e.g., Tablets/Blisters)</span></label>
+          <input type="number" id="inputQty" value="100000" min="0" oninput="calculateYield()" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm font-semibold text-slate-800" />
+        </div>
+
+        <!-- Packed Qty -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Packed Good Yield ($P$) <span class="text-slate-400 font-normal">(Finished Packs)</span></label>
+          <input type="number" id="packedQty" value="98500" min="0" oninput="calculateYield()" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm font-semibold text-slate-800" />
+        </div>
+
+        <!-- Sampling Qty -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Sampling Quantity ($S$) <span class="text-slate-400 font-normal">(IPC / QA / Retention)</span></label>
+          <input type="number" id="samplingQty" value="300" min="0" oninput="calculateYield()" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm font-semibold text-slate-800" />
+        </div>
+
+        <!-- Rejected Qty -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Rejected Waste ($R$) <span class="text-slate-400 font-normal">(Setup loss + Rejects)</span></label>
+          <input type="number" id="rejectedQty" value="1150" min="0" oninput="calculateYield()" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm font-semibold text-slate-800" />
+        </div>
+
+        <!-- Unused Qty -->
+        <div>
+          <label class="block text-xs font-semibold text-slate-600 mb-1">Unused Good Returned ($U$)</label>
+          <input type="number" id="unusedQty" value="0" min="0" oninput="calculateYield()" class="w-full px-3 py-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:outline-none text-sm font-semibold text-slate-800" />
+        </div>
+      </div>
+
+      <!-- Right Column: Live Results & Status -->
+      <div class="flex flex-col justify-between space-y-4">
+        <div>
+          <h2 class="text-sm font-bold text-slate-700 uppercase tracking-wider border-b pb-1">2. Reconciliation Results</h2>
+
+          <!-- Yield Cards -->
+          <div class="mt-4 space-y-3">
+            <!-- Actual Packaging Yield -->
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <div class="text-xs text-slate-500 font-medium">Actual Output Yield ($P / I \times 100$)</div>
+              <div id="actualYieldText" class="text-xl font-extrabold text-slate-800 mt-0.5">98.50 %</div>
+              <div class="text-[10px] text-slate-400">Target Standard Limit: &ge; 98.0%</div>
+            </div>
+
+            <!-- Total Reconciliation Yield -->
+            <div class="bg-slate-50 p-3 rounded-lg border border-slate-200">
+              <div class="text-xs text-slate-500 font-medium">Overall Mass Reconciliation ($[P+S+R+U]/I \times 100$)</div>
+              <div id="reconciliationYieldText" class="text-2xl font-extrabold text-slate-800 mt-0.5">99.95 %</div>
+              <div class="text-[10px] text-slate-400">cGMP Limit: 99.0% to 101.0%</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compliance Banner / Status Box -->
+        <div id="statusBanner" class="p-4 rounded-lg border-2 text-center transition-all duration-200 bg-emerald-50 border-emerald-500 text-emerald-800">
+          <div class="text-xs font-bold uppercase tracking-widest">Compliance Status</div>
+          <div id="statusText" class="text-2xl font-black mt-1">PASS</div>
+          <div id="statusSubText" class="text-xs mt-1 font-medium">Reconciliation is within cGMP limit (99.0% - 101.0%).</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="bg-slate-50 px-6 py-3 border-t border-slate-200 flex justify-between items-center text-[11px] text-slate-500">
+      <span>Formula: $Reconciliation = \frac{P + S + R + U}{I} \times 100$</span>
+      <span>Quality Assurance System</span>
+    </div>
+  </div>
+
+  <!-- JavaScript Calculator Logic -->
+  <script>
+    function calculateYield() {
+      // Get Values
+      const input = parseFloat(document.getElementById('inputQty').value) || 0;
+      const packed = parseFloat(document.getElementById('packedQty').value) || 0;
+      const sampling = parseFloat(document.getElementById('samplingQty').value) || 0;
+      const rejected = parseFloat(document.getElementById('rejectedQty').value) || 0;
+      const unused = parseFloat(document.getElementById('unusedQty').value) || 0;
+
+      // Guard clause for zero or negative input
+      if (input <= 0) {
+        document.getElementById('actualYieldText').innerText = '0.00 %';
+        document.getElementById('reconciliationYieldText').innerText = '0.00 %';
+        updateStatus(false, 'INVALID INPUT', 'Input quantity must be greater than zero.', 'yellow');
+        return;
+      }
+
+      // Calculations
+      const actualYield = (packed / input) * 100;
+      const totalReconciledUnits = packed + sampling + rejected + unused;
+      const reconciliationYield = (totalReconciledUnits / input) * 100;
+
+      // Update Texts
+      document.getElementById('actualYieldText').innerText = actualYield.toFixed(2) + ' %';
+      document.getElementById('reconciliationYieldText').innerText = reconciliationYield.toFixed(2) + ' %';
+
+      // Pass / Fail Logic (cGMP limits: 99.0% - 101.0%)
+      if (reconciliationYield >= 99.0 && reconciliationYield <= 101.0) {
+        updateStatus(
+          true,
+          'PASS',
+          'Reconciliation is within cGMP limits (99.0% - 101.0%).',
+          'emerald'
+        );
+      } else if (reconciliationYield < 99.0) {
+        updateStatus(
+          false,
+          'FAIL (UNACCOUNTED LOSS)',
+          `Unaccounted loss detected (${(100 - reconciliationYield).toFixed(2)}%). Initiate OOS investigation.`,
+          'rose'
+        );
+      } else {
+        updateStatus(
+          false,
+          'FAIL (SURPLUS DISCREPANCY)',
+          `Reconciliation exceeds 101.0% (${reconciliationYield.toFixed(2)}%). Verify count & raw inputs.`,
+          'rose'
+        );
+      }
+    }
+
+    function updateStatus(isPass, text, subtext, colorClass) {
+      const banner = document.getElementById('statusBanner');
+      const statusText = document.getElementById('statusText');
+      const statusSubText = document.getElementById('statusSubText');
+
+      statusText.innerText = text;
+      statusSubText.innerText = subtext;
+
+      // Reset classes
+      banner.className = `p-4 rounded-lg border-2 text-center transition-all duration-200 `;
+
+      if (colorClass === 'emerald') {
+        banner.classList.add('bg-emerald-50', 'border-emerald-500', 'text-emerald-800');
+      } else if (colorClass === 'rose') {
+        banner.classList.add('bg-rose-50', 'border-rose-500', 'text-rose-800');
+      } else {
+        banner.classList.add('bg-amber-50', 'border-amber-500', 'text-amber-800');
+      }
+    }
+
+    // Run initial calculation on load
+    calculateYield();
+  </script>
+</body>
+</html>
