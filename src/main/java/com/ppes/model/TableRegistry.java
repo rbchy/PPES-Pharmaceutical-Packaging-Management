@@ -95,7 +95,7 @@ public final class TableRegistry {
                 .field(new FieldDef("username", "Username", FieldType.TEXT).required(true))
                 .field(new FieldDef("password_hash", "Password", FieldType.PASSWORD).required(true))
                 .field(new FieldDef("role", "Role", FieldType.SELECT)
-                        .options("Admin", "Production", "QC", "Warehouse", "Supervisor"));
+                        .options("Admin", "Production", "QC", "Warehouse", "Maintenance", "Supervisor"));
         TABLES.put(users.key, users);
 
         // ---------------- batch_lot ----------------
