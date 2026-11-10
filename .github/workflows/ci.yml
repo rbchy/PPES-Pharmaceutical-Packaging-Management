@@ -1,0 +1,91 @@
+# PPES Desktop — CI pipeline
+# MySQL 8 -> load base schema + extension/module scripts + sample data
+# -> mvn verify (unit tests, runnable jar, database integration tests)
+# -> launch the jar under a virtual display to prove it starts.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, unit + database tests, launch check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+
+    env:
+      PPES_DB_HOST: 127.0.0.1
+      PPES_DB_PORT: "3306"
+      PPES_DB_NAME: ppes
+      PPES_DB_USER: root
+      PPES_DB_PASSWORD: root
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+
+      - name: Load database (base schema, extensions, modules, sample data)
+        run: |
+          M="mysql -h 127.0.0.1 -P 3306 -uroot -proot --default-character-set=utf8mb4"
+          set -e
+          for f in 00_base_schema.sql \
+                   PPES_extended_fields_schema.sql \
+                   PPES_extended_fields_2_schema.sql \
+                   PPES_carton_tracking_schema.sql \
+                   PPES_lot_closing_schema.sql \
+                   PPES_shift_production_schema.sql \
+                   PPES_work_order_packing_schema.sql \
+                   PPES_sample_data.sql; do
+            echo "== $f"; $M < "database/$f"
+          done
+          $M ppes -e "SHOW TABLES; SELECT COUNT(*) AS lots FROM batch_lot;"
+
+      - name: Build and test (mvn verify)
+        run: mvn -B -ntp verify
+
+      - name: Launch check (jar must still be running after 20 s)
+        run: |
+          sudo apt-get install -y -qq xvfb > /dev/null
+          set +e
+          timeout 20 xvfb-run -a java -jar target/ppes-desktop.jar > app.log 2>&1
+          code=$?
+          cat app.log
+          if [ "$code" = "124" ]; then echo "App started and was still running - OK"; exit 0; fi
+          echo "App exited early with code $code"; exit 1
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: |
+            target/surefire-reports
+            target/failsafe-reports
+          if-no-files-found: ignore
+
+      - name: Upload desktop jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: ppes-desktop-jar
+          path: target/ppes-desktop.jar

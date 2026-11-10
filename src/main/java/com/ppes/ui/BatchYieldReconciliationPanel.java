@@ -4,6 +4,7 @@ import javax.swing.*;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+import com.ppes.calc.YieldCalculator;
 
 /**
  * "Batch Yield Reconciliation Calculator" — Java Swing recreation of the
@@ -32,6 +33,7 @@ import java.awt.*;
  * pull Input/Packed/Reject numbers straight from work_order_packing_spec
  * and shift_production_log instead of manual entry.
  */
+
 public class BatchYieldReconciliationPanel extends JPanel {
 
     private static final Color PASS_BG = new Color(0xecfdf5);
@@ -224,31 +226,32 @@ public class BatchYieldReconciliationPanel extends JPanel {
         double rejected = parse(rejectedField);
         double unused = parse(unusedField);
 
-        if (input <= 0) {
+        YieldCalculator.Result r = YieldCalculator.calculate(input, packed, sampling, rejected, unused);
+        if (r.status == YieldCalculator.Status.INVALID_INPUT) {
             actualYieldValue.setText("0.00 %");
             reconciliationYieldValue.setText("0.00 %");
-            updateStatus("INVALID INPUT", "Input quantity (I) অবশ্যই শূন্যের চেয়ে বেশি হতে হবে।", WARN_BG, WARN_BORDER, WARN_TEXT);
+            updateStatus("INVALID INPUT",
+                    "Input (I) শূন্যের চেয়ে বেশি এবং কোনো পরিমাণ ঋণাত্মক হতে পারবে না।", WARN_BG, WARN_BORDER, WARN_TEXT);
             return;
         }
 
-        double actualYield = (packed / input) * 100.0;
-        double totalReconciled = packed + sampling + rejected + unused;
-        double reconciliationYield = (totalReconciled / input) * 100.0;
+        actualYieldValue.setText(String.format("%.2f %%", r.actualYield));
+        reconciliationYieldValue.setText(String.format("%.2f %%", r.reconciliationYield));
 
-        actualYieldValue.setText(String.format("%.2f %%", actualYield));
-        reconciliationYieldValue.setText(String.format("%.2f %%", reconciliationYield));
-
-        if (reconciliationYield >= 99.0 && reconciliationYield <= 101.0) {
-            updateStatus("PASS", "Reconciliation cGMP সীমার মধ্যে আছে (99.0% - 101.0%)।", PASS_BG, PASS_BORDER, PASS_TEXT);
-        } else if (reconciliationYield < 99.0) {
-            double missing = 100.0 - reconciliationYield;
-            updateStatus("FAIL (UNACCOUNTED LOSS)",
-                    String.format("অজানা ক্ষতি শনাক্ত হয়েছে (%.2f%%)। OOS ইনভেস্টিগেশন শুরু করুন।", missing),
-                    FAIL_BG, FAIL_BORDER, FAIL_TEXT);
-        } else {
-            updateStatus("FAIL (SURPLUS DISCREPANCY)",
-                    String.format("Reconciliation 101.0%%-এর বেশি (%.2f%%)। কাউন্ট ও র’ মেটেরিয়াল ইনপুট যাচাই করুন।", reconciliationYield),
-                    FAIL_BG, FAIL_BORDER, FAIL_TEXT);
+        switch (r.status) {
+            case PASS:
+                updateStatus("PASS", "Reconciliation cGMP সীমার মধ্যে আছে (99.0% - 101.0%)।", PASS_BG, PASS_BORDER, PASS_TEXT);
+                break;
+            case UNACCOUNTED_LOSS:
+                updateStatus("FAIL (UNACCOUNTED LOSS)",
+                        String.format("অজানা ক্ষতি শনাক্ত হয়েছে (%.2f%%)। OOS ইনভেস্টিগেশন শুরু করুন।", r.unaccountedPercent()),
+                        FAIL_BG, FAIL_BORDER, FAIL_TEXT);
+                break;
+            default:
+                updateStatus("FAIL (SURPLUS DISCREPANCY)",
+                        String.format("Reconciliation 101.0%%-এর বেশি (%.2f%%)। কাউন্ট ও র’ মেটেরিয়াল ইনপুট যাচাই করুন।",
+                                r.reconciliationYield),
+                        FAIL_BG, FAIL_BORDER, FAIL_TEXT);
         }
     }
 

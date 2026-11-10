@@ -33,14 +33,23 @@ public final class Db {
         return props;
     }
 
+    /** Environment variable first (keeps passwords out of the jar), then config.properties, then the default. */
+    static String setting(Properties p, String key, String envVar, String fallback) {
+        String env = System.getenv(envVar);
+        if (env != null && !env.isEmpty()) {
+            return env;
+        }
+        return p.getProperty(key, fallback);
+    }
+
     /** Opens a new JDBC connection. Caller is responsible for closing it (use try-with-resources). */
     public static Connection getConnection() throws SQLException {
         Properties p = loadProps();
-        String host = p.getProperty("db.host", "localhost");
-        String port = p.getProperty("db.port", "3306");
-        String name = p.getProperty("db.name", "ppes");
-        String user = p.getProperty("db.user", "root");
-        String pass = p.getProperty("db.password", "");
+        String host = setting(p, "db.host", "PPES_DB_HOST", "localhost");
+        String port = setting(p, "db.port", "PPES_DB_PORT", "3306");
+        String name = setting(p, "db.name", "PPES_DB_NAME", "ppes");
+        String user = setting(p, "db.user", "PPES_DB_USER", "root");
+        String pass = setting(p, "db.password", "PPES_DB_PASSWORD", "");
 
         String url = "jdbc:mysql://" + host + ":" + port + "/" + name
                 + "?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC&characterEncoding=UTF-8";
